@@ -4,7 +4,7 @@
 
 "use strict";
 
-/* eslint-disable no-undef */
+/* global JSZip */
 
 /**
  * Sends a progress notification message to the inspector panel.
@@ -16,9 +16,9 @@
  */
 function notifyProgress(tabId, progress) {
   browser.runtime.sendMessage({
-    msg: 'notify-progress',
+    msg: "notify-progress",
     tabId,
-    progress
+    progress,
   });
 }
 
@@ -56,7 +56,7 @@ async function loadFile(filename, type = null) {
       throw new Error("Network response was not ok " + response.statusText);
     }
 
-    const extension = url.split('.').pop().toLowerCase();
+    const extension = url.split(".").pop().toLowerCase();
     if (type == "blob") {
       data = await response.blob();
     } else if (extension === "json") {
@@ -98,7 +98,7 @@ function blobToArrayBuffer(blob) {
  */
 function dataURLToBlob(url) {
   const binary = atob(url.split(",", 2)[1]); // Decode base64 data
-  let contentType = url.split(",", 1)[0];   // Extract the content type
+  let contentType = url.split(",", 1)[0]; // Extract the content type
   contentType = contentType.split(";", 1)[0].split(":", 2)[1];
 
   // Default to "image/png" if the content type is not supported
@@ -107,7 +107,7 @@ function dataURLToBlob(url) {
   }
 
   // Convert binary string to Uint8Array
-  const data = Uint8Array.from(binary, char => char.charCodeAt(0));
+  const data = Uint8Array.from(binary, (char) => char.charCodeAt(0));
 
   // Create and return a Blob
   return new Blob([data], { type: contentType });
@@ -127,7 +127,7 @@ async function download(filename, blob, saveAs = true) {
   // Trigger download with a save-as dialog
   const url = URL.createObjectURL(blob);
   try {
-    await browser.downloads.download({url, filename, saveAs});
+    await browser.downloads.download({ url, filename, saveAs });
   } finally {
     // Clean up the Blob URL after download
     URL.revokeObjectURL(url);
@@ -181,18 +181,23 @@ class HighlightFeature {
           return;
         }
         const rect = element.getBoundingClientRect();
-        const isInViewport = (
+        const isInViewport =
           rect.top >= 0 &&
           rect.left >= 0 &&
-          rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) &&
-          rect.right <= (window.innerWidth || document.documentElement.clientWidth)
-        );
+          rect.bottom <=
+            (window.innerHeight || document.documentElement.clientHeight) &&
+          rect.right <=
+            (window.innerWidth || document.documentElement.clientWidth);
 
         if (!isInViewport) {
-          element.scrollIntoView({behavior: 'smooth', block: 'center', inline: 'nearest'});
+          element.scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+            inline: "nearest",
+          });
         }
       },
-      args: [inspectId]
+      args: [inspectId],
     });
   }
 
@@ -210,18 +215,21 @@ class HighlightFeature {
     const frames = await browser.webNavigation.getAllFrames({ tabId });
     for (const frame of frames) {
       const inspectIds = fieldDetails
-        .filter(fd => fd.frameId == frame.frameId)
-        .map(fd => fd.inspectId);
+        .filter((fd) => fd.frameId == frame.frameId)
+        .map((fd) => fd.inspectId);
       browser.scripting.executeScript({
         target: {
           tabId,
           frameIds: [frame.frameId],
         },
         func: (aType, aInspectIds) => {
-          aInspectIds.forEach(inspectId => {
-            const color = aType == 'select' ? 'blue' : 'red';
-            const bgColor = aType == 'select' ? 'rgba(0, 0, 255, 0.2)' : 'rgba(255, 0, 0, 0.2)';
-            const zIndex = aType == 'select' ? 9999 : 9998;
+          aInspectIds.forEach((inspectId) => {
+            const color = aType == "select" ? "blue" : "red";
+            const bgColor =
+              aType == "select"
+                ? "rgba(0, 0, 255, 0.2)"
+                : "rgba(255, 0, 0, 0.2)";
+            const zIndex = aType == "select" ? 9999 : 9998;
 
             const selector = `[data-moz-autofill-inspect-id="${inspectId}"]`;
             const element = document.querySelector(selector);
@@ -249,13 +257,15 @@ class HighlightFeature {
             });
 
             const rect = element.getBoundingClientRect();
-            highlightOverlay.style.top = rect.top + window.scrollY - BORDER + 'px';
-            highlightOverlay.style.left = rect.left + window.scrollX - BORDER + 'px';
-            highlightOverlay.style.width = rect.width + 'px';
-            highlightOverlay.style.height = rect.height + 'px';
+            highlightOverlay.style.top =
+              rect.top + window.scrollY - BORDER + "px";
+            highlightOverlay.style.left =
+              rect.left + window.scrollX - BORDER + "px";
+            highlightOverlay.style.width = rect.width + "px";
+            highlightOverlay.style.height = rect.height + "px";
           });
         },
-        args: [type, inspectIds]
+        args: [type, inspectIds],
       });
     }
   }
@@ -271,13 +281,13 @@ class HighlightFeature {
     browser.scripting.executeScript({
       target: {
         tabId,
-        frameIds: [...frames.map(frame => frame.frameId)],
+        frameIds: [...frames.map((frame) => frame.frameId)],
       },
       func: () => {
-        document.querySelectorAll('div.moz-autofill-overlay').forEach(element =>
-          element.remove()
-        );
-      }
+        document
+          .querySelectorAll("div.moz-autofill-overlay")
+          .forEach((element) => element.remove());
+      },
     });
   }
 
@@ -295,20 +305,22 @@ class HighlightFeature {
     const frames = await browser.webNavigation.getAllFrames({ tabId });
     for (const frame of frames) {
       const inspectIds = fieldDetails
-        .filter(fd => fd.frameId == frame.frameId)
-        .map(fd => fd.inspectId);
+        .filter((fd) => fd.frameId == frame.frameId)
+        .map((fd) => fd.inspectId);
       browser.scripting.executeScript({
         target: {
           tabId,
           frameIds: [frame.frameId],
         },
         func: (aType, aInspectIds) => {
-          aInspectIds.forEach(inspectId => {
-            const overlay = document.getElementById(`moz-${aType}-highlight-overlay-${inspectId}`);
+          aInspectIds.forEach((inspectId) => {
+            const overlay = document.getElementById(
+              `moz-${aType}-highlight-overlay-${inspectId}`,
+            );
             overlay?.remove();
           });
         },
-        args: [type, inspectIds]
+        args: [type, inspectIds],
       });
     }
   }
@@ -327,8 +339,8 @@ class DownloadPageFeature {
     const frames = await browser.webNavigation.getAllFrames({ tabId });
     for (const frame of frames) {
       const inspectedFields = fieldDetails
-        .filter(fd => fd.frameId == frame.frameId)
-        .map(fd => [fd.inspectId, fd.fieldName]);
+        .filter((fd) => fd.frameId == frame.frameId)
+        .map((fd) => [fd.inspectId, fd.fieldName]);
       if (!inspectedFields.length) {
         continue;
       }
@@ -336,7 +348,7 @@ class DownloadPageFeature {
       await browser.scripting.executeScript({
         target: {
           tabId,
-          frameIds: [frame.frameId]
+          frameIds: [frame.frameId],
         },
         func: (aInspectedFields) => {
           for (const [inspectId, fieldName] of aInspectedFields) {
@@ -345,7 +357,7 @@ class DownloadPageFeature {
             element?.setAttribute("data-moz-autofill-type", fieldName);
           }
         },
-        args: [inspectedFields]
+        args: [inspectedFields],
       });
     }
   }
@@ -361,12 +373,18 @@ class DownloadPageFeature {
       browser.runtime.onMessage.addListener(waitForFreeze);
     });
 
-    browser.scripting.executeScript({
-      target: { tabId, frameIds: [frame.frameId] },
-      files: ["/content/content-script.js"],
-    }).then(() => {
-      browser.tabs.sendMessage(tabId, { message: "content-freeze-page" }, { frameId: frame.frameId });
-    });
+    browser.scripting
+      .executeScript({
+        target: { tabId, frameIds: [frame.frameId] },
+        files: ["/content/content-script.js"],
+      })
+      .then(() => {
+        browser.tabs.sendMessage(
+          tabId,
+          { message: "content-freeze-page" },
+          { frameId: frame.frameId },
+        );
+      });
 
     return await freezePromise;
   }
@@ -375,12 +393,12 @@ class DownloadPageFeature {
     for (let [url, path] of urlToPath) {
       url = url.replace(/&/g, "&amp;");
       // Replace iframe src=url to point to local file
-      const regexURL = url.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regexURL = url.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
       // TODO: Need to update this regexp
-      let regex = new RegExp(`<iframe\\s+[^>]*src=["'](${regexURL})["']`, 'i');
+      let regex = new RegExp(`<iframe\\s+[^>]*src=["'](${regexURL})["']`, "i");
       html = html.replace(regex, (match, capturedURL) => {
-        return match.replace(capturedURL, path)
+        return match.replace(capturedURL, path);
       });
     }
 
@@ -390,16 +408,17 @@ class DownloadPageFeature {
 
     // Remove attributes that are used by inspector
     const regex = /data-moz-autofill-inspect-id="\{[^}]*\}"/g;
-    html = html.replace(regex, '');
+    html = html.replace(regex, "");
     return html;
   }
 
   static async freezePage(tabId, fieldDetails) {
     let frames = await browser.webNavigation.getAllFrames({ tabId });
-    const mainFrame = frames.find(frame => frame.parentFrameId == -1);
-    const iframes = frames.filter(frame =>
-      frame.parentFrameId == mainFrame.frameId &&
-      !frame.url.startsWith("about:")
+    const mainFrame = frames.find((frame) => frame.parentFrameId == -1);
+    const iframes = frames.filter(
+      (frame) =>
+        frame.parentFrameId == mainFrame.frameId &&
+        !frame.url.startsWith("about:"),
     );
 
     // Put the main-frame to the last one because we want to freeze the sub-frames first.
@@ -412,12 +431,18 @@ class DownloadPageFeature {
     const urlToPath = [];
     for (let idx = 0; idx < frames.length; idx++) {
       const frame = frames[idx];
-      notifyProgress(tabId, `freezing frame (${idx+1}/${frames.length}) - ${frame.url}`);
+      notifyProgress(
+        tabId,
+        `freezing frame (${idx + 1}/${frames.length}) - ${frame.url}`,
+      );
       let html;
       try {
         html = await DownloadPageFeature.#runFreeze(tabId, frame);
       } catch (error) {
-        notifyProgress(tabId, `Error freezing frame (${idx+1}/${frames.length}) - ${frame.url} : ${error}`);
+        notifyProgress(
+          tabId,
+          `Error freezing frame (${idx + 1}/${frames.length}) - ${frame.url} : ${error}`,
+        );
       }
 
       let filename;
@@ -426,12 +451,15 @@ class DownloadPageFeature {
         urlToPath.push([frame.url, filename]);
       } else {
         filename = `${new URL(frame.url).host}.html`;
-        html = DownloadPageFeature.#postProcessingMainFrameHTML(html, urlToPath);
+        html = DownloadPageFeature.#postProcessingMainFrameHTML(
+          html,
+          urlToPath,
+        );
       }
       pages.push({
         filename,
-        blob: new Blob([html], { type: 'text/html' }),
-      })
+        blob: new Blob([html], { type: "text/html" }),
+      });
     }
 
     return pages;
@@ -450,11 +478,16 @@ class DownloadPageFeature {
       }),
     });
 
-    const dataUrl =
-      await browser.experiments.autofill.captureTab(tabId, 0, 0, result.width, result.height);
+    const dataUrl = await browser.experiments.autofill.captureTab(
+      tabId,
+      0,
+      0,
+      result.width,
+      result.height,
+    );
     return {
       filename: `screenshot-${host}.png`,
-      blob: dataURLToBlob(dataUrl)
+      blob: dataURLToBlob(dataUrl),
     };
   }
 
@@ -464,7 +497,7 @@ class DownloadPageFeature {
     const host = await getHostNameByTabId(tabId);
     return {
       filename: `inspect-${host}.png`,
-      blob: dataURLToBlob(panelDataUrl)
+      blob: dataURLToBlob(panelDataUrl),
     };
   }
 }
@@ -485,12 +518,17 @@ class GenerateTestFeature {
     let sectionIndex;
     for (const fieldDetail of fieldDetails) {
       // Skip fields that are invisible or lack a field name
-      if (!fieldDetail.fieldName || (!fieldDetail.isVisible && fieldDetail.localName == "input")) {
+      if (
+        !fieldDetail.fieldName ||
+        (!fieldDetail.isVisible && fieldDetail.localName == "input")
+      ) {
         continue;
       }
 
-      if (fieldDetail.formIndex != formIndex ||
-          fieldDetail.sectionIndex != sectionIndex) {
+      if (
+        fieldDetail.formIndex != formIndex ||
+        fieldDetail.sectionIndex != sectionIndex
+      ) {
         formIndex = fieldDetail.formIndex;
         sectionIndex = fieldDetail.sectionIndex;
 
@@ -512,14 +550,15 @@ class GenerateTestFeature {
   }
 
   static async create(host, fieldDetails) {
-    const inspectResult = GenerateTestFeature.#fieldDetailsToTestExpectedResult(fieldDetails);
+    const inspectResult =
+      GenerateTestFeature.#fieldDetailsToTestExpectedResult(fieldDetails);
     const filename = `${host}.json`;
     const text = JSON.stringify(inspectResult, null, 2);
 
     const scriptBlob = await loadFile("data/gen-test.py", "blob");
     return [
       { filename, blob: text },
-      { filename: `gen-test.py` , blob: scriptBlob }
+      { filename: `gen-test.py`, blob: scriptBlob },
     ];
   }
 }
@@ -528,7 +567,12 @@ class ReportIssueFeature {
   static BUGZILLA_NEW_BUG_URL =
     "https://bugzilla.mozilla.org/enter_bug.cgi?product=Toolkit&component=Form+Autofill";
 
-  static async #uploadAttachmentToBugzilla(tabId, filename, type, panelDataUrl) {
+  static async #uploadAttachmentToBugzilla(
+    tabId,
+    filename,
+    type,
+    panelDataUrl,
+  ) {
     notifyProgress(tabId, "exporting inspect result");
     const blob = dataURLToBlob(panelDataUrl);
     const arrayBuffer = await blobToArrayBuffer(blob);
@@ -552,7 +596,7 @@ class ReportIssueFeature {
           bytes[i] = binaryString.charCodeAt(i);
         }
         const zipBlob = new Blob([bytes], { aType });
-        const testFile= new File([zipBlob], aFilename, { aType });
+        const testFile = new File([zipBlob], aFilename, { aType });
         const dataTransfer = new DataTransfer();
         dataTransfer.items.add(testFile);
 
@@ -561,7 +605,7 @@ class ReportIssueFeature {
         const event = new Event("change", { bubbles: true });
         file.dispatchEvent(event);
       },
-      args: [filename, type, base64]
+      args: [filename, type, base64],
     });
   }
 
@@ -569,101 +613,112 @@ class ReportIssueFeature {
     notifyProgress(tabId, "opening bugzilla");
     const host = await getHostNameByTabId(tabId);
 
-    browser.tabs.create({url: ReportIssueFeature.BUGZILLA_NEW_BUG_URL}, (tab) => {
-      browser.tabs.onUpdated.addListener(async function listener(aTabId, changeInfo) {
-        if (aTabId != tab.id) {
-          return;
-        }
-
-        if (changeInfo.status != "complete") {
-          return;
-        }
-
-        browser.scripting.executeScript({
-          target: { tabId: tab.id },
-          func: () => {
-            // Function to create and show the dialog
-            function showDialog(message) {
-              // Create a dialog element
-              const dialog = document.createElement('dialog');
-              dialog.id = 'moz-autofill-inspector-dialog';
-              dialog.style.width = '300px';
-              dialog.style.padding = '20px';
-              dialog.style.border = '1px solid #ccc';
-              dialog.style.borderRadius = '8px';
-              dialog.style.boxShadow = '0px 4px 8px rgba(0, 0, 0, 0.2)';
-              dialog.style.fontFamily = 'Arial, sans-serif';
-              dialog.style.textAlign = 'center';
-              dialog.style.zIndex = '9999';
-
-              // Add a message
-              const statusMessage = document.createElement('p');
-              statusMessage.id = 'dialog-status-message';
-              statusMessage.textContent = message;
-              dialog.appendChild(statusMessage);
-
-              // Add the dialog to the document
-              document.body.appendChild(dialog);
-
-              // Show the dialog
-              dialog.showModal();
-              dialog.offsetHeight;
-
-              return dialog; // Return the dialog element for later use
+    browser.tabs.create(
+      { url: ReportIssueFeature.BUGZILLA_NEW_BUG_URL },
+      (tab) => {
+        browser.tabs.onUpdated.addListener(
+          async function listener(aTabId, changeInfo) {
+            if (aTabId != tab.id) {
+              return;
             }
 
-            showDialog("Filling Information for you...");
+            if (changeInfo.status != "complete") {
+              return;
+            }
+
+            browser.scripting.executeScript({
+              target: { tabId: tab.id },
+              func: () => {
+                // Function to create and show the dialog
+                function showDialog(message) {
+                  // Create a dialog element
+                  const dialog = document.createElement("dialog");
+                  dialog.id = "moz-autofill-inspector-dialog";
+                  dialog.style.width = "300px";
+                  dialog.style.padding = "20px";
+                  dialog.style.border = "1px solid #ccc";
+                  dialog.style.borderRadius = "8px";
+                  dialog.style.boxShadow = "0px 4px 8px rgba(0, 0, 0, 0.2)";
+                  dialog.style.fontFamily = "Arial, sans-serif";
+                  dialog.style.textAlign = "center";
+                  dialog.style.zIndex = "9999";
+
+                  // Add a message
+                  const statusMessage = document.createElement("p");
+                  statusMessage.id = "dialog-status-message";
+                  statusMessage.textContent = message;
+                  dialog.appendChild(statusMessage);
+
+                  // Add the dialog to the document
+                  document.body.appendChild(dialog);
+
+                  // Show the dialog
+                  dialog.showModal();
+                  dialog.offsetHeight;
+
+                  return dialog; // Return the dialog element for later use
+                }
+
+                showDialog("Filling Information for you...");
+              },
+            });
+
+            browser.scripting.executeScript({
+              target: { tabId: tab.id },
+              func: (aHost, aChanges) => {
+                const short_description = document.getElementById("short_desc");
+                if (short_description) {
+                  const names = aChanges.map((c) => c.fieldName);
+                  let description;
+                  if (!names.length) {
+                    description = "";
+                  } else if (names.length == 1) {
+                    description = `on ${names[0]} Field`;
+                  } else if (names.length == 2) {
+                    description = `on ${names[0]} and ${names[1]} Fields`;
+                  } else {
+                    const last = names[names.length - 1];
+                    const others = names.slice(0, -1).join(", ");
+                    description = `on ${others}, and ${last} Fields`;
+                  }
+                  short_description.value = `[${aHost}]Autofill doesn't work ${description}`;
+                }
+                const URL = document.getElementById("bug_file_loc");
+                if (URL) {
+                  URL.value = `https://${aHost}`;
+                }
+                const attachFile = document.getElementById("attach-new-file");
+                if (attachFile) {
+                  attachFile.click();
+                }
+              },
+              args: [host, changes],
+            });
+
+            ReportIssueFeature.#uploadAttachmentToBugzilla(
+              tab.id,
+              "inspect.png",
+              "image/png",
+              attachmentDataUrl,
+            );
+
+            browser.scripting.executeScript({
+              target: { tabId: tab.id },
+              func: () => {
+                const dialog = document.getElementById(
+                  "moz-autofill-inspector-dialog",
+                );
+                dialog?.close();
+                dialog?.remove();
+              },
+            });
+
+            // Remove the listener after injection
+            browser.tabs.onUpdated.removeListener(listener);
           },
-        });
-
-        browser.scripting.executeScript({
-          target: { tabId: tab.id },
-          func: (aHost, aChanges) => {
-            const short_description = document.getElementById("short_desc");
-            if (short_description) {
-              const names = aChanges.map(c => c.fieldName);
-              let description;
-              if (!names.length) {
-                description = '';
-              } else if (names.length == 1) {
-                description = `on ${names[0]} Field`;
-              } else if (names.length == 2) {
-                description = `on ${names[0]} and ${names[1]} Fields`;
-              } else {
-                const last = names[names.length - 1];
-                const others = names.slice(0, -1).join(', ');
-                description = `on ${others}, and ${last} Fields`;
-              }
-              short_description.value =
-                `[${aHost}]Autofill doesn't work ${description}`;
-            }
-            const URL = document.getElementById("bug_file_loc");
-            if (URL) {
-              URL.value = `https://${aHost}`;
-            }
-            const attachFile = document.getElementById("attach-new-file");
-            if (attachFile) {
-              attachFile.click();
-            }
-          },
-          args: [host, changes]
-        });
-
-        ReportIssueFeature.#uploadAttachmentToBugzilla(tab.id, "inspect.png", "image/png", attachmentDataUrl);
-
-        browser.scripting.executeScript({
-          target: { tabId: tab.id },
-          func: () => {
-            const dialog = document.getElementById('moz-autofill-inspector-dialog');
-            dialog?.close();
-            dialog?.remove();
-          },
-        });
-
-        // Remove the listener after injection
-        browser.tabs.onUpdated.removeListener(listener);
-      });
-    });
+        );
+      },
+    );
   }
 }
 
@@ -693,18 +748,20 @@ class AutofillFeature {
     await browser.scripting.executeScript({
       target: {
         tabId,
-        frameIds: [...frames.map(frame => frame.frameId)],
+        frameIds: [...frames.map((frame) => frame.frameId)],
       },
       func: () => {
-        document.querySelectorAll('input, select, iframe').forEach(element => {
-          const INSPECT_ATTRIBUTE = "data-moz-autofill-inspect-id";
-          let uuid = element.getAttribute(INSPECT_ATTRIBUTE);
-          if (!uuid) {
-            uuid = crypto.randomUUID();
-            element.setAttribute(INSPECT_ATTRIBUTE, uuid);
-          }
-        });
-      }
+        document
+          .querySelectorAll("input, select, iframe")
+          .forEach((element) => {
+            const INSPECT_ATTRIBUTE = "data-moz-autofill-inspect-id";
+            let uuid = element.getAttribute(INSPECT_ATTRIBUTE);
+            if (!uuid) {
+              uuid = crypto.randomUUID();
+              element.setAttribute(INSPECT_ATTRIBUTE, uuid);
+            }
+          });
+      },
     });
   }
 
@@ -721,7 +778,7 @@ class AutofillFeature {
       await AutofillFeature.#setInspectId(tabId);
       const result = await browser.experiments.autofill.inspect(tabId, changes);
       await browser.runtime.sendMessage({
-        msg: 'inspect-complete',
+        msg: "inspect-complete",
         tabId,
         data: result,
       });
@@ -754,7 +811,10 @@ class AutofillFeature {
     }
 
     try {
-      await browser.experiments.autofill.setTemporaryRecordsForTab(tabId, records);
+      await browser.experiments.autofill.setTemporaryRecordsForTab(
+        tabId,
+        records,
+      );
     } catch (error) {
       console.error("Failed to set test records:", error);
     }
@@ -795,12 +855,15 @@ async function handleMessage(request) {
       const host = await getHostNameByTabId(tabId);
 
       const screenshot = await DownloadPageFeature.screenshot(tabId);
-      const inspect = await DownloadPageFeature.exportInspect(tabId, panelDataUrl);
+      const inspect = await DownloadPageFeature.exportInspect(
+        tabId,
+        panelDataUrl,
+      );
       const pages = await DownloadPageFeature.freezePage(tabId, fieldDetails);
-      pages.forEach(page => page.filename = `page/${page.filename}`);
+      pages.forEach((page) => (page.filename = `page/${page.filename}`));
 
       const tests = await GenerateTestFeature.create(host, fieldDetails);
-      tests.forEach(test => test.filename = `test/${test.filename}`);
+      tests.forEach((test) => (test.filename = `test/${test.filename}`));
 
       zipAndDownload([screenshot, inspect, ...pages, ...tests], host, "report");
       break;
@@ -812,7 +875,7 @@ async function handleMessage(request) {
         DownloadPageFeature.screenshot(tabId),
         DownloadPageFeature.exportInspect(tabId, panelDataUrl),
       ]);
-      files.forEach(file => download(file.filename, file.blob, false));
+      files.forEach((file) => download(file.filename, file.blob, false));
       break;
     }
     case "report-issue": {

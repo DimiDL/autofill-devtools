@@ -4,8 +4,6 @@
 
 "use strict";
 
-/* global browser */
-
 browser.devtools.panels.create(
   "Autofill", // title
   "icons/icon.svg", // icon

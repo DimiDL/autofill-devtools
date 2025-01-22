@@ -16,7 +16,6 @@
   "browser_specific_settings": {
     "gecko": {
       "id": "autofill-devtools@mozilla.com",
-      "update_url": "https://example.org/tests/junit/update_manifest.json",
       "strict_min_version": "135.0"
     }
   },

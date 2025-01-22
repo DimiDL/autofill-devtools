@@ -34,7 +34,15 @@ export default [
     },
   },
   {
-    files: ["extension/content/*.mjs"],
+    files: ["extension/*.js"],
+    languageOptions: {
+      globals: {
+        ...globals.browser,
+      },
+    },
+  },
+  {
+    files: ["extension/content/*.js"],
     languageOptions: {
       globals: {
         ...globals.browser,

@@ -4,7 +4,7 @@
 
 "use strict";
 
-/* global ChromeUtils ExtensionAPI */
+/* global ExtensionAPI */
 
 const lazy = {};
 ChromeUtils.defineESModuleGetters(lazy, {
@@ -45,15 +45,17 @@ this.autofill = class extends ExtensionAPI {
             const { browser } = tabManager.get(tabId);
 
             const zoom = browser.browsingContext.fullZoom;
-            const scale = browser.browsingContext.topChromeWindow.devicePixelRatio || 1;
-            const rect = new context.xulBrowser.ownerGlobal.window.DOMRect(x, y, width, height);
+            const scale =
+              browser.browsingContext.topChromeWindow.devicePixelRatio || 1;
+            const rect = new context.xulBrowser.ownerGlobal.window.DOMRect(
+              x,
+              y,
+              width,
+              height,
+            );
 
             const wgp = browser.browsingContext.currentWindowGlobal;
-            const image = await wgp.drawSnapshot(
-              rect,
-              scale * zoom,
-              "white"
-            );
+            const image = await wgp.drawSnapshot(rect, scale * zoom, "white");
 
             const canvas = new OffscreenCanvas(image.width, image.height);
 
@@ -97,11 +99,17 @@ this.autofill = class extends ExtensionAPI {
               const formIndex = forms.indexOf(form);
               for (const section of form) {
                 const sectionIndex = form.indexOf(section);
-                section.fieldDetails.forEach(fd => fd.formIndex = formIndex);
-                section.fieldDetails.forEach(fd => fd.sectionIndex = sectionIndex);
+                section.fieldDetails.forEach(
+                  (fd) => (fd.formIndex = formIndex),
+                );
+                section.fieldDetails.forEach(
+                  (fd) => (fd.sectionIndex = sectionIndex),
+                );
 
                 for (const fieldDetail of section.fieldDetails) {
-                  const bc = bcs.find(b => b.id == fieldDetail.browsingContextId);
+                  const bc = bcs.find(
+                    (b) => b.id == fieldDetail.browsingContextId,
+                  );
                   const host = bc.currentWindowGlobal.documentPrincipal.host;
 
                   fieldDetail.frameId = lazy.WebNavigationFrames.getFrameId(bc);
@@ -109,8 +117,11 @@ this.autofill = class extends ExtensionAPI {
                   if (!bc || bc == bc.top) {
                     // main-frame
                     fieldDetail.frame = `(M) ${host}`;
-                  } else if (bc.currentWindowGlobal.documentPrincipal.equals(
-                      bc.top.currentWindowGlobal.documentPrincipal)) {
+                  } else if (
+                    bc.currentWindowGlobal.documentPrincipal.equals(
+                      bc.top.currentWindowGlobal.documentPrincipal,
+                    )
+                  ) {
                     // same-origin iframe
                     fieldDetail.frame = `(S) ${host}`;
                   } else {
