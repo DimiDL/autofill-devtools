@@ -20,18 +20,14 @@
     }
   },
 
-   "host_permissions": [
-     "*://*/*"
-   ],
+  "host_permissions": [
+    "*://*/*"
+  ],
 
   "web_accessible_resources": [
     {
       "resources": [
-        "libs/freeze-dry.es.js",
-        "libs/jszip.js",
-        "data/test-addresses.json",
-        "data/test-credit-cards.json",
-        "data/gen-test.py"
+        "libs/jszip.js"
       ],
       "matches": ["<all_urls>"]
     }
