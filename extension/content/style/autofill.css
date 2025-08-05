@@ -294,3 +294,44 @@ body,
 .field-list-item td select.changed {
   border: 2px solid red;
 }
+
+/*.split-panel {*/
+  /*transition: opacity 0.3s ease;*/
+  /*opacity: 0;*/
+  /*height: 200px; [> Adjust height as necessary <]*/
+  /*background-color: #f4f4f4;*/
+/*}*/
+
+/*.split-panel-content {*/
+  /*flex-grow: 1;*/
+  /*padding: 10px;*/
+  /*background-color: #fff;*/
+  /*overflow-y: auto;*/
+/*}a*/
+
+.splitter {
+  min-height: 2px;
+  appearance: none;
+  background-image: none;
+  border: 0;
+  border-style: solid;
+  border-color: transparent;
+  background-color: #e0e0e2;
+  background-clip: content-box;
+  position: relative;
+
+  box-sizing: border-box;
+
+  z-index: 1;
+}
+
+.split-panel {
+  /*height: 100%; [> Adjust height as necessary <]*/
+  background-color: #f4f4f4;
+  display: none; /* Initially hidden */
+}
+
+.split-panel-content {
+  background-color: #f4f4f4;
+  overflow-y: auto;
+}

@@ -12,7 +12,12 @@
   <body class="theme-body">
     <div class="autofill-panel">
       <div id="field" class="devtools-toolbar" role="toolbar">
-        <button id="autofill-inspect-start-button">Click to Inspect</button>
+        <button id="autofill-inspect-start-button">Inspect</button>
+        <span class="devtools-separator"></span>
+        <label class="devtools-checkbox-label devtools-cache-checkbox">
+          <input id="autofill-enable-ai-mode-button" type="checkbox" class="devtools-checkbox" checked/>
+          AI Mode
+        </label>
         <span class="devtools-separator"></span>
         <label class="devtools-checkbox-label devtools-cache-checkbox">
           <input id="autofill-show-invisible-button" type="checkbox" class="devtools-checkbox"/>
@@ -46,7 +51,21 @@
         <span class="devtools-separator"></span>
         <menu-button id="autofill-setting-button" title="Setting" class="devtools-button autofill-setting-button"></menu-button>
       </div>
-      <div class="field-list-container">
+      <!-- Sibling panel (initially hidden) -->
+      <div id="ai-mode-panel" class="split-panel" style="display: none;">
+        <div class="split-panel-content">
+          <h3>Upload Files</h3>
+          <!-- Upload Button -->
+          <input type="file" id="autofill-ai-mode-upload-button"/>
+          <div id="file-list-container"></div>
+          <h3>Opened Tabs</h3>
+          <button id="autofill-ai-mode-open-tab-button">Query Opened Tab</button>
+          <div id="tab-list-container"></div>
+          <h3>Form Hisotry</h3>
+        </div>
+        <div id="splitter" class="splitter"></div>
+      </div>
+      <div id="inspect-mode-panel" class="field-list-container">
         <div class="field-list-scroll">
           <table class="field-list-table">
             <thead class="field-list-headers-group">
@@ -57,9 +76,9 @@
             </tbody>
           </table>
         </div>
-        <div class="devtools-toolbar devtools-toolbar-bottom">
-          <div class="status-bar-label autofill-progress-status">Status</div>
-        </div>
+      </div>
+      <div class="devtools-toolbar devtools-toolbar-bottom">
+        <div class="status-bar-label autofill-progress-status">Status</div>
       </div>
     </div>
 

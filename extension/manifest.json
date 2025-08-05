@@ -40,6 +40,13 @@
       "96": "content/icons/icon.svg"
   },
 
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content/content-autocomplete-script.js"]
+    }
+  ],
+
   "background": {
     "scripts": [ "background.js" ],
     "type": "module"

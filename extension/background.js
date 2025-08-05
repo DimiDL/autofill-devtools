@@ -311,10 +311,6 @@ class HighlightFeature {
 
 class DownloadPageFeature {
   /**
-   * Remove attributes we have set for inspector before saving the page, which includes:
-   * - data-moz-autofill-inspect-id
-   * - data-moz-autofill-inspector-change
-   *
    * We will save additional attribte - `data-moz-autofill-type` so we can use this
    * for ML training
    */
@@ -372,18 +368,23 @@ class DownloadPageFeature {
     return await freezePromise;
   }
 
-  static #postProcessingMainFrameHTML(html, urlToPath) {
-    for (let [url, path] of urlToPath) {
-      url = url.replace(/&/g, "&amp;");
-      // Replace iframe src=url to point to local file
-      const regexURL = url.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  static #postProcessingMainFrameHTML(html, mozIdToPath) {
 
-      // TODO: Need to update this regexp
-      let regex = new RegExp(`<iframe\\s+[^>]*src=["'](${regexURL})["']`, "i");
-      html = html.replace(regex, (match, capturedURL) => {
-        return match.replace(capturedURL, path);
-      });
-    }
+    // Process all <iframe data-moz-autofill-inspect-id="...">
+    html = html.replace(/<iframe\b[^>]*data-moz-autofill-inspect-id="([^"]+)"[^>]*>/gi, (match, id) => {
+      const path = mozIdToPath.get(id);
+      if (!path) {
+        return match; // If no mapping, leave unchanged
+      }
+
+      // Remove any existing src="..." from the tag
+      let updated = match.replace(/\s+src=(["'])(.*?)\1/, "");
+
+      // Add new src at the end of opening tag, before '>'
+      updated = updated.replace(/<iframe\b/, `<iframe src="${path}"`);
+
+      return updated;
+    });
 
     // Add `self` to frame-src  Content Script PolicyEnsure to ensure we can load
     // iframe with local file
@@ -411,8 +412,10 @@ class DownloadPageFeature {
     notifyProgress(tabId, "freezing page - setting data attributes");
     await DownloadPageFeature.#beforeFreeze(tabId, fieldDetails);
 
+    const info = await DownloadPageFeature.#getIframesInfo(tabId);
+
     const pages = [];
-    const urlToPath = [];
+    const mozIdToPath = new Map();
     for (let idx = 0; idx < frames.length; idx++) {
       const frame = frames[idx];
       notifyProgress(
@@ -432,13 +435,12 @@ class DownloadPageFeature {
       let filename;
       if (idx != frames.length - 1) {
         filename = `${new URL(frame.url).host}/${idx}.html`;
-        urlToPath.push([frame.url, filename]);
+        const iframeInfo = info.find(iframe => iframe[0] == frame.url);
+        info.splice(info.indexOf(iframeInfo), 1);
+        mozIdToPath.set(iframeInfo[1], filename);
       } else {
         filename = `${new URL(frame.url).host}.html`;
-        html = DownloadPageFeature.#postProcessingMainFrameHTML(
-          html,
-          urlToPath,
-        );
+        html = DownloadPageFeature.#postProcessingMainFrameHTML(html, mozIdToPath);
       }
       pages.push({
         filename,
@@ -483,6 +485,79 @@ class DownloadPageFeature {
       filename: `inspect-${host}.png`,
       blob: dataURLToBlob(panelDataUrl),
     };
+  }
+
+  static async #getIframesInfo(tabId) {
+    // 1. Get all frames for the given tab
+    const frames = await browser.webNavigation.getAllFrames({ tabId });
+    const iframes = frames.filter(f => f.frameId !== 0 && f.parentFrameId === 0);
+
+    // 2. Inject a listener into each iframe that listens for "assign-id"
+    //    and posts back its location to the parent window
+    for (const frame of iframes) {
+      await browser.scripting.executeScript({
+        target: { tabId, frameIds: [frame.frameId] },
+        func: () => {
+          window.addEventListener("message", (e) => {
+            if (e.data?.type === "assign-id") {
+              const id = e.data.id;
+              const url = location.href;
+              window.parent.postMessage({ type: "report-origin", id, url }, "*");
+            }
+          });
+        }
+      });
+    }
+
+    // 3. In the main frame: listen for iframe reports and dispatch "assign-id"
+    //    messages to all iframes with a data-moz-autofill-inspect-id attribute
+    const [{ result: expectedCount }] = await browser.scripting.executeScript({
+      target: { tabId, frameIds: [0] },
+      func: () => {
+        window.addEventListener("message", (e) => {
+          if (e.data?.type === "report-origin") {
+            browser.runtime.sendMessage({
+              type: "iframe-mapping",
+              id: e.data.id,
+              url: e.data.url,
+            });
+          }
+        });
+
+        let count = 0;
+        document.querySelectorAll("iframe[data-moz-autofill-inspect-id]").forEach((iframe) => {
+          const id = iframe.dataset.mozAutofillInspectId;
+          try {
+            iframe.contentWindow?.postMessage({ type: "assign-id", id }, "*");
+            count++;
+          } catch (_) {
+            // ignore inaccessible or sandboxed iframes
+          }
+        });
+        return count;
+      }
+    });
+
+    if (expectedCount == 0) {
+      return [];
+    }
+
+    // 4. Listen for messages from main frame (relayed from iframes)
+    const results = [];
+    await new Promise((resolve) => {
+      function onMessage(msg) {
+        if (msg?.type === "iframe-mapping") {
+          results.push([msg.url, msg.id]);
+          if (results.length === expectedCount) {
+            browser.runtime.onMessage.removeListener(onMessage);
+            resolve();
+          }
+        }
+      }
+      browser.runtime.onMessage.addListener(onMessage);
+    });
+
+    return results;
   }
 }
 
@@ -725,6 +800,21 @@ async function handleMessage(request) {
     case "remove-highlight": {
       const { type, fieldDetails } = request;
       HighlightFeature.removeHighlightOverlay(tabId, type, fieldDetails);
+      break;
+    }
+    case "queryTabs": {
+      const results = [];
+      const tabs = await browser.tabs.query(
+        {
+          currentWindow: true,
+        }
+      );
+      results.push(...tabs.map(tab => ({id: tab.id, title: tab.title, url: tab.url})));
+      browser.runtime.sendMessage({
+        msg: "query-tabs-complete",
+        tabId,
+        results,
+      });
       break;
     }
   }

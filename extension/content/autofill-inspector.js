@@ -163,13 +163,16 @@ class AutofillInspector {
     ["autofill-download-button", () => this.onDownloadPage()],
     ["autofill-edit-field-button", (event) => this.onEditFields(event)],
     ["autofill-generate-test-button", () => this.onGenerateReport()],
+    ["autofill-ai-mode-open-tab-button", () => this.onAIModeQueryTabs()],
   ];
 
   #checkboxChangeHandlers = [
+    ["autofill-enable-ai-mode-button", () => this.onAIModeEnable()],
     ["autofill-show-invisible-button", () => this.onFilterFields()],
     ["autofill-show-unknown-button", () => this.onFilterFields()],
     ["autofill-add-address-button", () => this.onAddOrRemoveTestRecord()],
     ["autofill-add-credit-card-button", () => this.onAddOrRemoveTestRecord()],
+    ["autofill-ai-mode-upload-button", () => this.onAIModeUploadFile(event)],
   ];
 
   #menuItemClickHandlers = [
@@ -237,6 +240,9 @@ class AutofillInspector {
     );
 
     this.initSettingMenuItems();
+
+    // Dimi: Tmp
+    this.onAIModeEnable();
   }
 
   initSettingMenuItems() {
@@ -277,6 +283,10 @@ class AutofillInspector {
       }
       case "notify-progress": {
         this.#updateProgress(request.progress);
+        break;
+      }
+      case "query-tabs-complete": {
+        this.#onAIModeOpenTabResult(request.results);
         break;
       }
     }
@@ -331,6 +341,7 @@ class AutofillInspector {
   async onDownloadPage() {
     this.#updateProgress("downloading page");
     await this.waitForInspect();
+    await new Promise((resolve) => { setTimeout(resolve, 1000); });
 
     sendMessage("download-page", {
       fieldDetails: this.#inspectedFieldDetails,
@@ -341,6 +352,7 @@ class AutofillInspector {
   async onGenerateReport() {
     this.#updateProgress("generating report");
     await this.waitForInspect();
+    await new Promise((resolve) => { setTimeout(resolve, 1000); });
 
     const panelDataUrl = await this.#captureInspectorPanel();
     sendMessage("generate-report", {
@@ -425,6 +437,18 @@ class AutofillInspector {
     }
   }
 
+  onAIModeEnable() {
+    const checked = document.getElementById("autofill-enable-ai-mode-button").checked;
+    const aiModePanel = document.getElementById("ai-mode-panel");
+    if (checked) {
+      aiModePanel.style.display = "block";
+      //inspectPanel.style.display = "none";
+    } else {
+      aiModePanel.style.display = "none";
+      //inspectPanel.style.display = "block";
+    }
+  }
+
   onFilterFields() {
     this.#updateFieldsInfo(this.#inspectedFieldDetails);
   }
@@ -435,6 +459,125 @@ class AutofillInspector {
       creditcard: document.getElementById("autofill-add-credit-card-button")
         .checked,
     });
+  }
+
+  #addItemToList(obj) {
+    const listContainer = document.getElementById("tab-list-container");
+
+    // Create a list item
+    const listItem = document.createElement("li");
+
+    // Create checkbox element
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.id = `item-checkbox-${obj.title}`;
+    checkbox.classList.add("item-checkbox");
+
+    // Create title element
+    const title = document.createElement("span");
+    title.classList.add("item-title");
+    title.textContent = obj.title;
+
+    // Create URL element
+    const url = document.createElement("a");
+    url.classList.add("item-url");
+    url.href = obj.url;
+    url.textContent = obj.url;
+    url.target = "_blank"; // Open link in a new tab
+
+    // Append checkbox, title, and URL to list item
+    const label = document.createElement("label");
+    label.setAttribute("for", checkbox.id);
+
+    // Append elements to list item
+    listItem.appendChild(checkbox);
+    listItem.appendChild(label);
+    listItem.appendChild(title);
+    listItem.appendChild(url);
+
+    // Append list item to list container
+    listContainer.appendChild(listItem);
+  }
+  
+  #addFileToList(file) {
+    const listContainer = document.getElementById("file-list-container");
+
+    // Create a list item
+    const listItem = document.createElement("li");
+
+    // Create checkbox element
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.id = `file-checkbox-${file.name}`;
+    checkbox.classList.add("file-checkbox");
+
+    // Create file name element
+    const fileName = document.createElement("span");
+    fileName.classList.add("file-item");
+    fileName.textContent = file.name;
+
+    // Append checkbox and file name to list item
+    const label = document.createElement("label");
+    label.setAttribute("for", checkbox.id);
+
+    // Append elements to list item
+    listItem.appendChild(checkbox);
+    listItem.appendChild(label);
+    listItem.appendChild(fileName);
+
+    // Append list item to file list container
+    listContainer.appendChild(listItem);
+  }
+
+  onAIModeQueryTabs() {
+    sendMessage("queryTabs");
+  }
+
+  #onAIModeOpenTabResult(resuts) {
+    resuts.forEach((tab) => {
+      this.#addItemToList({
+        title: tab.title,
+        url: tab.url,
+      });
+    });
+  }
+
+  onAIModeUploadFile(event) {
+    const file = event.target.files[0]; // Get the selected file
+
+    if (!file) {
+      alert("Please select a file.");
+      return;
+    }
+
+    this.#updateProgress("Reading file: 0%")
+
+    // Create a FileReader instance
+    const reader = new FileReader();
+
+    // Handle progress event during file reading
+    reader.onprogress = (event) => {
+      if (event.lengthComputable) {
+        const percent = (event.loaded / event.total) * 100;
+        this.#updateProgress(`Reading file: ${percent}%`);
+      }
+    };
+
+    // When file reading is completed
+    reader.onloadend = () => {
+      this.#updateProgress("Reading file complete");
+
+      // Add the file to the list with checkbox and file name
+      this.#addFileToList(file);
+    };
+
+    // Handle file reading errors
+    reader.onerror = () =>{
+      this.#updateProgress(`Error reading file: ${reader.error.message}`);
+    };
+
+    // Read the file as Data URL (for images or other files)
+    reader.readAsDataURL(file); // You can also use other read methods like readAsText, etc.
   }
 
   /**
