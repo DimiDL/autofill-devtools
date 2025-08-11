@@ -289,6 +289,11 @@ class AutofillInspector {
         this.#onAIModeOpenTabResult(request.results);
         break;
       }
+      case "ai-response-complete": {
+        const content = request.content;
+        document.getElementById("text-output").textContent = content;
+        dump("[Dimi]inspector see " + content + "\n");
+      }
     }
   }
 
@@ -301,6 +306,7 @@ class AutofillInspector {
     }
     sendMessage("inspect", {
       changes: Array.from(this.#updateFieldDetailByInspectId.values()),
+      aimode: document.getElementById("autofill-enable-ai-mode-button").checked,
     });
   }
 

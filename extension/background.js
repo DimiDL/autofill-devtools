@@ -5,6 +5,105 @@
 "use strict";
 
 /* global JSZip */
+let mlSuggestions = null;
+
+function constuctPrompt(params) {
+  return `You are provided with personal information and a webpage's HTML markup. Please analyze the page to identify any forms, their types, and the fillable fields within them.
+1. Identify Forms:
+   Count the number of forms on the page and determine the type of each form (e.g., Address, Credit Card, Job Application, etc.).
+2. Extract Provided Data:
+   Extract relevant values from the provided data, for example:
+     - If the provided data represents a date (e.g., expiry data="12/25"), try to autofill fields such as expiry month with 12 and expiry year with 25.
+     - If the data represents a name, email, or phone number, try to autofill relevant fields that match those categories.
+     - If the data is in a structured format (e.g., address="123 Main St"), map the appropriate parts of the address (e.g., street name, city, zip code) to the corresponding fields in the form.
+3. Identify Fields:
+   For each form, list all the input, textarea, and select fields that with "data-moz-autofill-inspect-id" attribute, if the attribute doesn't exist, omit the field. For each field:
+   - Classify the field (e.g., Name, Email, Phone Number, Date of Birth, etc.) based on the content.
+   - If the field type is unknown, label it as Unknown.
+4. Match Fillable Fields:
+   - For each form field, compare the field with the provided data (e.g., personal information from uploaded files, form history, etc.).
+   - If decomposing the provided data is needed in order to autofill, do it. For example, "John Doe" can be split to autofill first name and last name field.
+   - If a field matches the provided data, include the field in the output with the value to fill under the key "fillValue".
+   - If a field cannot be autofilled, meaning there is no relevant information that matches or can be derived from the provided data, set the "fillValue" to an empty string ("").
+5. Output Format:
+Provide the result in the following JSON format:
+{
+  "forms": [
+    {
+      "formType": "Credit Card",
+      "fields": [
+        {
+          "fieldType": "Credit Card",
+          "dataMozAutofillInspectId": "70D98D88-AC16-4293-80F3-511BE73AF7D1", // from "data-moz-autofill-inspect-id" attribute
+          "fillValue": "1234 5678 9876 5432"
+        },
+        {
+          "fieldType": "Expiry Date",
+          "dataMozAutofillInspectId": "A35DDAA3-DD02-46AA-A783-66C49238EDCF",
+          "fillValue": "12/25"
+        },
+      ]
+    }
+  ]
+}
+
+Provided Information:
+  - Personal Information (e.g., from uploaded files, form history, etc.): ${params.userData}
+  - HTML markup of the webpage: ${params.pageMarkup}
+`;
+}
+
+let conversationHistory = [
+  {
+    "role": 'system',
+    "content": `You are a field autofill assistant. Follow the user instructions exactly.
+    Return output as JSON only. No explanations, no extra text, no Markdown. If a value is unknown, use an empty string (""). Do not echo or summarize the HTML. The response should be a valid JSON object`
+    //"content": `You are a field autofill assistant. Follow the user instructions exactly.
+    //Return output as JSON only and the explanations why a field is filled or not filled`
+  }
+];
+
+async function getOpenAIResponse(prompt) {
+  try {
+    //const { openai_api_key, openai_ai_model } = await browser.storage.local.get(
+      //[LocalStorageKeys.OPENAI_API_KEY, LocalStorageKeys.OPENAI_AI_MODEL]
+    //)
+    prompt = prompt || 'What is the capital of France?';
+    const openai_api_key = "";
+    let openai_ai_model;
+    console.log("[Dimi]send completion request to OpenAI >>\n");
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${openai_api_key || ''}`,
+      },
+      body: JSON.stringify({
+        model: openai_ai_model || 'gpt-4o',
+        messages: [
+          {
+            role: 'system',
+            content: `${conversationHistory[0].content}`
+          },
+          { role: 'user', content: prompt },
+        ],
+        temperature: 0.7,
+      }),
+    })
+    console.log("[Dimi]send completion request to OpenAI <<\n");
+
+    const data = await response.json()
+    let content = data.choices[0].message.content
+    content = content.replace(/^`+|`+$/g, '');
+    content = content.replace(/^json|^`+|`+$/g, '');
+
+    console.log("[Dimi]getOPenAIResponse response is " + content + "\n");
+    return JSON.parse(content);
+  } catch (error) {
+    console.log("[Dimi]getOPenAIResponse error " + error + "\n");
+    console.error('Error fetching OpenAI response:', error)
+  }
+}
 
 /**
  * Sends a progress notification message to the inspector panel.
@@ -722,18 +821,127 @@ class AutofillFeature {
   }
 }
 
-async function handleMessage(request) {
-  const tabId = request.tabId;
-  if (!tabId) {
-    return;
+class AIModeFeature {
+  static userData() {
+    //const data = {
+      //"cc-number": "4111111111111111",
+      //"cc-exp": "12/25",
+      //"cc-csc": "123",
+      //"cc-name": "John Doe"
+    //};
+
+    const data = {
+      "name": "John Doe",
+      organization: "World Wide Web Consortium",
+      "street-address": "32 Vassar Street\nMIT Room 32-G524",
+      "address-level2": "Cambridge",
+      "address-level1": "MA",
+      "postal-code": "02139",
+      country: "US",
+      tel: "+16172535702",
+      email: "timbl@w3.org",
+    };
+    return data;
   }
+
+  static async #setInspectId(tabId) {
+    const frames = await browser.webNavigation.getAllFrames({ tabId });
+    await browser.scripting.executeScript({
+      target: {
+        tabId,
+        frameIds: [...frames.map((frame) => frame.frameId)],
+      },
+      func: () => {
+        document
+          .querySelectorAll("input, select, textarea")
+          .forEach((element) => {
+            const INSPECT_ATTRIBUTE = "data-moz-autofill-inspect-id";
+            let uuid = element.getAttribute(INSPECT_ATTRIBUTE);
+            if (!uuid) {
+              uuid = crypto.randomUUID();
+              element.setAttribute(INSPECT_ATTRIBUTE, uuid);
+            }
+          });
+      },
+    });
+  }
+
+  static convertResponseToFieldDetails(content) {
+    const fieldDetails = [];
+    if (!content.forms || !Array.isArray(content.forms)) {
+      return fieldDetails;
+    }
+
+    let formIndex = 0;
+    let sectionIndex = 0;
+    content.forms.forEach((form) => {
+      form.fields.forEach((field) => {
+        fieldDetails.push({
+          formIndex,
+          sectionIndex,
+          frameId: 0, // Assuming all fields are in the main frame
+          isVisible: true,
+          inspectId: field.dataMozAutofillInspectId,
+          fieldName: field.fieldType,
+          formType: form.formType,
+          reason: "AI inferred",
+        });
+      });
+      formIndex++;
+      sectionIndex++;
+    });
+
+    return fieldDetails;
+  }
+
+  static async inspect(tabId) {
+    try {
+      let pageMarkup;
+      await AIModeFeature.#setInspectId(tabId);
+      await browser.scripting.executeScript({
+        target: { tabId },
+        func: () => {
+          return document.documentElement.outerHTML;
+        },
+      })
+      .then((result) => {
+        pageMarkup = result[0].result;
+        console.log(pageMarkup); // Handle the markup as needed
+      });
+      const content = await getOpenAIResponse(constuctPrompt({
+        "userData": JSON.stringify(AIModeFeature.userData()),
+        pageMarkup,
+      }));
+
+      console.log("[Dimi]AI response content is " + JSON.stringify(content) + "\n");
+      //await AutofillFeature.#setInspectId(tabId);
+      await browser.runtime.sendMessage({
+        msg: "inspect-complete",
+        tabId,
+        data: AIModeFeature.convertResponseToFieldDetails(content),
+      });
+    } catch (error) {
+      console.warn("Failed to send inspect-complete message:", error);
+    }
+  }
+}
+
+async function handleMessage(request, sender) {
+  const tabId = request.tabId || sender?.tab?.id;
+  //if (!tabId) {
+    //return;
+  //}
 
   switch (request.msg) {
     // Run autofill fields inspection
     case "inspect": {
       const { changes } = request;
       HighlightFeature.removeAllHighlightOverlay(tabId);
-      AutofillFeature.inspect(tabId, changes);
+      if (request.aimode) {
+        AIModeFeature.inspect(tabId);
+      } else {
+        AutofillFeature.inspect(tabId, changes);
+      }
       break;
     }
     case "set-test-records": {
@@ -814,6 +1022,16 @@ async function handleMessage(request) {
         msg: "query-tabs-complete",
         tabId,
         results,
+      });
+      break;
+    }
+    case "ai-response": {
+      const { content } = request;
+      dump("[Dimi]background script reveice " + content + "\n");
+      browser.runtime.sendMessage({
+        msg: "ai-response-complete",
+        tabId,
+        content,
       });
       break;
     }

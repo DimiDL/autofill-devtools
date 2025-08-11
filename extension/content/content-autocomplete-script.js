@@ -4,6 +4,8 @@
 
 "use strict";
 
+let mlSuggestions = null;
+
 let popup = document.getElementById('autocomplete-popup');
 if (!popup) {
   popup = document.createElement('div');
@@ -22,11 +24,11 @@ let preview = document.createElement('div');
 preview.id = 'autocomplete-preview';
 document.body.appendChild(preview);
 
-document.addEventListener('focus', function(event) {
+document.addEventListener('focus', async (event) => {
   const inputElement = event.target;
 
   if (inputElement.tagName === 'INPUT' && ['text', 'email'].includes(inputElement.type)) {
-    showAutocompletePopup(inputElement);
+    await showAutocompletePopup(inputElement);
     // Hide the popup when the input loses focus (blur event)
     inputElement.addEventListener('blur', function() {
       setTimeout(function() {
@@ -40,7 +42,7 @@ document.addEventListener('focus', function(event) {
   }
 }, true);
 
-function autofill(inputElement, suggestion) {
+async function autofill(inputElement, suggestion) {
   inputElement.value = suggestion;
   inputElement.removeAttribute('data-moz-previous-value');
   inputElement.removeAttribute('data-moz-previous-bg-value');
@@ -58,16 +60,41 @@ function clearPreview(inputElement) {
   inputElement.removeAttribute('data-moz-previous-bg-value');
 }
 
-// Function to display preview text (either on the input or a dedicated preview area)
-function displayPreview(inputElement, suggestion) {
-
-  inputElement.dataset.mozPreviousValue = inputElement.value;
-  inputElement.dataset.mozPreviousBGValue = inputElement.style.backgroundColor;
-  inputElement.value = `${suggestion}`;
-  inputElement.style.backgroundColor = '#e0f7fa'; // Change input background color
+// Step 1: Function to find the form containing the specified autofillId
+function findFormByAutofillId(data, targetAutofillId) {
+  // Iterate through all forms to find the form containing the target autofillId
+  for (let form of data.forms) {
+    for (let field of form.fields) {
+      if (field.dataMozMlAutofillId === targetAutofillId) {
+        return form;  // Return the form containing the target field
+      }
+    }
+  }
+  return null;  // Return null if no matching form is found
 }
 
-function showAutocompletePopup(inputElement) {
+// Function to display preview text (either on the input or a dedicated preview area)
+function displayPreview(inputElement, suggestion) {
+  const form = findFormByAutofillId(mlSuggestions, inputElement.getAttribute('data-moz-ml-autofill-id'));
+  if (!form) {
+    return; // If no form is found, do nothing
+  }
+
+  form.fields.forEach(field => {
+    const suggestion = field.fillValue || '';
+    if (!suggestion) {
+      return; // Skip if no suggestion is available
+    }
+
+    const element = document.querySelector(`[data-moz-ml-autofill-id="${field.dataMozMlAutofillId}"]`);;
+    element.dataset.mozPreviousValue = inputElement.value;
+    element.dataset.mozPreviousBGValue = inputElement.style.backgroundColor;
+    element.value = `${suggestion}`;
+    element.style.backgroundColor = '#e0f7fa'; // Change input background color
+  });
+}
+
+async function showAutocompletePopup(inputElement) {
   const suggestions = ['user@example.com', 'test@example.com', 'admin@example.com'];
 
   const list = document.createElement('ul');
@@ -96,8 +123,13 @@ function showAutocompletePopup(inputElement) {
       clearPreview(inputElement);
     });
 
-    listItem.addEventListener('click', function() {
-      autofill(inputElement, suggestion);
+    listItem.addEventListener('click', async () => {
+      dump("[Dimi]autofill\n");
+      //if (!mlSuggestions) {
+        //mlSuggestions = await identify(inputElement);
+        //dump("[Dimi]autofill suggestion is " + mlSuggestions + "\n");
+    //}
+      //await autofill(inputElement, suggestion);
       popup.style.display = 'none';
       preview.style.display = 'none';
     });
