@@ -69,7 +69,6 @@ async function getOpenAIResponse(prompt) {
       //[LocalStorageKeys.OPENAI_API_KEY, LocalStorageKeys.OPENAI_AI_MODEL]
     //)
     prompt = prompt || 'What is the capital of France?';
-    const openai_api_key = "";
     let openai_ai_model;
     console.log("[Dimi]send completion request to OpenAI >>\n");
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -885,6 +884,7 @@ class AIModeFeature {
           fieldName: field.fieldType,
           formType: form.formType,
           reason: "AI inferred",
+          fillValue: field.fillValue,
         });
       });
       formIndex++;
@@ -908,19 +908,25 @@ class AIModeFeature {
         pageMarkup = result[0].result;
         console.log(pageMarkup); // Handle the markup as needed
       });
+      notifyProgress(tabId, "AI processing...");
       const content = await getOpenAIResponse(constuctPrompt({
         "userData": JSON.stringify(AIModeFeature.userData()),
         pageMarkup,
       }));
+      notifyProgress(tabId, "AI processing complete");
 
       console.log("[Dimi]AI response content is " + JSON.stringify(content) + "\n");
-      //await AutofillFeature.#setInspectId(tabId);
+      await browser.tabs.sendMessage(tabId, {
+        msg: "ai-autofill-fields",
+        data: content,
+      });
       await browser.runtime.sendMessage({
         msg: "inspect-complete",
         tabId,
         data: AIModeFeature.convertResponseToFieldDetails(content),
       });
     } catch (error) {
+      notifyProgress(tabId, "AI processing failed with error " + error);
       console.warn("Failed to send inspect-complete message:", error);
     }
   }

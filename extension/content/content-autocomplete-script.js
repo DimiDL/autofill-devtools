@@ -4,7 +4,7 @@
 
 "use strict";
 
-let mlSuggestions = null;
+let mlAutofillSuggestions = null;
 
 let popup = document.getElementById('autocomplete-popup');
 if (!popup) {
@@ -42,30 +42,13 @@ document.addEventListener('focus', async (event) => {
   }
 }, true);
 
-async function autofill(inputElement, suggestion) {
-  inputElement.value = suggestion;
-  inputElement.removeAttribute('data-moz-previous-value');
-  inputElement.removeAttribute('data-moz-previous-bg-value');
-}
-
-// Function to clear preview text (reset preview area or placeholder)
-function clearPreview(inputElement) {
-  if (inputElement.hasAttribute('data-moz-previous-value')) {
-    inputElement.value = inputElement.dataset.mozPreviousValue || '';
-    inputElement.style.backgroundColor = inputElement.dataset.mozPreviousBGValue || '';
-  }
-
-  // remove mozPreviousValue and mozPreviousBGValue attributes
-  inputElement.removeAttribute('data-moz-previous-value');
-  inputElement.removeAttribute('data-moz-previous-bg-value');
-}
 
 // Step 1: Function to find the form containing the specified autofillId
 function findFormByAutofillId(data, targetAutofillId) {
   // Iterate through all forms to find the form containing the target autofillId
   for (let form of data.forms) {
     for (let field of form.fields) {
-      if (field.dataMozMlAutofillId === targetAutofillId) {
+      if (field.dataMozAutofillInspectId === targetAutofillId) {
         return form;  // Return the form containing the target field
       }
     }
@@ -74,28 +57,49 @@ function findFormByAutofillId(data, targetAutofillId) {
 }
 
 // Function to display preview text (either on the input or a dedicated preview area)
-function displayPreview(inputElement, suggestion) {
-  const form = findFormByAutofillId(mlSuggestions, inputElement.getAttribute('data-moz-ml-autofill-id'));
+function displayPreview(inputElement, suggestion, { preview = true, clear = false } = {}) {
+  const form = findFormByAutofillId(suggestion, inputElement.getAttribute('data-moz-autofill-inspect-id'));
   if (!form) {
     return; // If no form is found, do nothing
   }
 
+  dump("[Dimi]display preview " + preview + "/ " + clear + "\n");
   form.fields.forEach(field => {
-    const suggestion = field.fillValue || '';
-    if (!suggestion) {
+    const element = document.querySelector(`[data-moz-autofill-inspect-id="${field.dataMozAutofillInspectId}"]`);;
+
+    if (clear) {
+      if ((preview && element.dataset.mozAutofillState === 'preview') ||
+         (!preview && element.dataset.mozAutofillState === 'autofilled')) {
+        element.value = element.dataset.mozDefaultValue || '';
+        element.style.backgroundColor = element.dataset.mozDefaultBGValue || '';
+        element.removeAttribute('data-moz-default-value');
+        element.removeAttribute('data-moz-default-b-g-value');
+        element.removeAttribute('data-moz-autofill-state');
+      }
+      return;
+    } else if (preview && element.dataset.mozAutofillState === 'autofilled') {
+      return;
+    }
+
+    const fillValue = field.fillValue || '';
+    if (!fillValue) {
       return; // Skip if no suggestion is available
     }
 
-    const element = document.querySelector(`[data-moz-ml-autofill-id="${field.dataMozMlAutofillId}"]`);;
-    element.dataset.mozPreviousValue = inputElement.value;
-    element.dataset.mozPreviousBGValue = inputElement.style.backgroundColor;
-    element.value = `${suggestion}`;
+    element.dataset.mozAutofillState = preview ? 'preview' : 'autofilled';
+    if (!element.hasAttribute("data-moz-default-value")) {
+      element.dataset.mozDefaultValue = element.value;
+      element.dataset.mozDefaultBGValue = element.style.backgroundColor;
+    }
+    element.value = `${fillValue}`;
     element.style.backgroundColor = '#e0f7fa'; // Change input background color
   });
 }
 
 async function showAutocompletePopup(inputElement) {
-  const suggestions = ['user@example.com', 'test@example.com', 'admin@example.com'];
+  const useText = 'Use AI Autofill Suggestion';
+  const clearText = 'Clear Autofill Suggestion';
+  const suggestions = [useText, clearText];
 
   const list = document.createElement('ul');
   list.id = 'autocomplete-list';
@@ -112,24 +116,22 @@ async function showAutocompletePopup(inputElement) {
     // When hovered over, change the background color
     listItem.addEventListener('mouseover', function() {
       listItem.style.backgroundColor = '#f0f0f0'; // Change background color on hover
-
-      displayPreview(inputElement, suggestion); // Update the preview text (input or preview area)
+      if (suggestion == useText) {
+        displayPreview(inputElement, mlAutofillSuggestions, { preview: true, clear: false}); // Update the preview text (input or preview area)
+      }
     });
 
     // When mouse leaves the item, reset background color
     listItem.addEventListener('mouseleave', function() {
       listItem.style.backgroundColor = ''; // Reset background color
-
-      clearPreview(inputElement);
+      if (suggestion == useText) {
+        displayPreview(inputElement, mlAutofillSuggestions, { preview: true, clear: true}); 
+      }
     });
 
     listItem.addEventListener('click', async () => {
-      dump("[Dimi]autofill\n");
-      //if (!mlSuggestions) {
-        //mlSuggestions = await identify(inputElement);
-        //dump("[Dimi]autofill suggestion is " + mlSuggestions + "\n");
-    //}
-      //await autofill(inputElement, suggestion);
+      const clear = suggestion === clearText;
+      displayPreview(inputElement, mlAutofillSuggestions, { preview: false, clear}); 
       popup.style.display = 'none';
       preview.style.display = 'none';
     });
@@ -145,3 +147,11 @@ async function showAutocompletePopup(inputElement) {
   popup.style.left = rect.left + window.scrollX + 'px';
   popup.style.display = 'block';
 }
+
+browser.runtime.onMessage.addListener((request, sender) => {
+  console.log("[Dimi]Received ai-autofill-fields message " + request.msg + "\n");
+  if (request.msg === "ai-autofill-fields") {
+    dump("[Dimi]Received ai-autofill-fields message " + JSON.stringify(request.data) + "\n");
+    mlAutofillSuggestions = request.data;
+  }
+});

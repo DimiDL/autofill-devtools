@@ -160,6 +160,13 @@ body,
   border-inline-start: 1px solid var(--theme-splitter-color);
 }
 
+[data-mode="normal"] #col-fillValue { display: none; }
+
+[data-mode="ai"] #col-frame,
+[data-mode="ai"] #col-identifier,
+[data-mode="ai"] #col-isVisible,
+[data-mode="ai"] #col-confidence,
+[data-mode="ai"] #col-part { display: none; }
 /* Field List Item */
 
 .field-list-item {

@@ -199,6 +199,7 @@ class AutofillInspector {
     { id: "col-isVisible", text: "Visible" },
     { id: "col-part", text: "Part" },
     { id: "col-confidence", text: "Confidence" },
+    { id: "col-fillValue", text: "Fill Value" },
   ];
 
   constructor() {
@@ -446,11 +447,14 @@ class AutofillInspector {
   onAIModeEnable() {
     const checked = document.getElementById("autofill-enable-ai-mode-button").checked;
     const aiModePanel = document.getElementById("ai-mode-panel");
+    const panel = document.querySelector('.field-list-container');
     if (checked) {
       aiModePanel.style.display = "block";
+      panel.setAttribute('data-mode', "ai");
       //inspectPanel.style.display = "none";
     } else {
       aiModePanel.style.display = "none";
+      panel.setAttribute('data-mode', "normal");
       //inspectPanel.style.display = "block";
     }
   }
@@ -796,9 +800,13 @@ class AutofillInspector {
 
         // Set Style.
         if (column.id == "col-section") {
-          fieldDetail.fieldName.startsWith("cc-")
-            ? td.classList.add("field-credit-card-icon")
-            : td.classList.add("field-address-icon");
+          if (fieldDetail.formType) {
+            td.appendChild(document.createTextNode(fieldDetail.formType));
+          } else {
+            fieldDetail.fieldName.startsWith("cc-")
+              ? td.classList.add("field-credit-card-icon")
+              : td.classList.add("field-address-icon");
+          }
         } else if (column.id == "col-fieldName") {
           // Show different style for fields that we have edited its field name manually.
           this.#originFieldNameByInspectId.get(fieldDetail.inspectId) !=
