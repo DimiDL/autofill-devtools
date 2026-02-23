@@ -111,6 +111,9 @@ async function download(filename, blob, saveAs = true) {
   const url = URL.createObjectURL(blob);
   try {
     await browser.downloads.download({ url, filename, saveAs });
+  } catch (error) {
+    console.error("download() failed:", error);
+    throw error;
   } finally {
     // Clean up the Blob URL after download
     URL.revokeObjectURL(url);
